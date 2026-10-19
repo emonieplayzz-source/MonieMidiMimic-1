@@ -1,0 +1,39 @@
+name: Build Windows VST3
+
+# Runs on every push, or by hand from the Actions tab ("Run workflow").
+# The finished plugin is attached to the run as "MonieMidiMimic-Windows-x64".
+on:
+  push:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        run: cmake -S . -B build -A x64
+
+      - name: Build VST3 + Standalone
+        run: cmake --build build --config Release --parallel --target MonieMidiMimic_VST3 MonieMidiMimic_Standalone
+
+      - name: Package
+        shell: pwsh
+        run: |
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item -Recurse "build/MonieMidiMimic_artefacts/Release/VST3/Monie MIDI Mimic.vst3" "dist/"
+          Copy-Item "build/MonieMidiMimic_artefacts/Release/Standalone/Monie MIDI Mimic.exe" "dist/"
+          Copy-Item install.bat, README.md "dist/"
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: MonieMidiMimic-Windows-x64
+          path: dist
+
+      - name: Engine tests
+        continue-on-error: true
+        run: |
+          cmake -S . -B build-tests -A x64 -DMIMIC_BUILD_PLUGIN=OFF -DMIMIC_BUILD_TESTS=ON
+          cmake --build build-tests --config Release --parallel
+          build-tests\MimicEngineTests_artefacts\Release\MimicEngineTests.exe
